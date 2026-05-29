@@ -246,9 +246,32 @@ body{font-family:'Noto Sans TC',sans-serif;background:var(--page-bg);min-height:
   .mode-tab{padding:8px 16px;font-size:11px;}
 
   /* 預覽畫布：用實際尺寸縮小（非 transform），避免留白與裁切 */
-  .preview-col{width:100%;align-items:center;}
-  .canvas-wrap.carousel{width:88vw;height:88vw;max-width:440px;max-height:440px;}
-  .canvas-wrap.story{width:49.5vw;height:88vw;max-width:247px;max-height:440px;}
+  .canvas-wrap.carousel{width:62vw;height:62vw;max-width:310px;max-height:310px;}
+  .canvas-wrap.story{width:35vw;height:62vw;max-width:174px;max-height:310px;}
+
+  /* 預覽區整塊黏在頂部，往下捲動調滑桿時持續可見 */
+  .main{align-items:stretch;display:block;}
+  .preview-col{
+    position:-webkit-sticky;
+    position:sticky;
+    top:0;
+    z-index:50;
+    width:100%;
+    background:var(--page-bg);
+    padding:8px 0 12px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--border);
+    gap:0.5rem;
+  }
+  .edit-col{width:100%;}
+
+  /* sticky 預覽區內：壓縮導覽與匯出按鈕高度，避免黏頂區塊太高 */
+  .preview-col .nav-row{gap:8px;}
+  .preview-col .nav-btn{width:38px;height:38px;font-size:18px;}
+  .preview-col .nav-label{font-size:10px;}
+  .preview-col #exportOneBtn{padding:9px 0;font-size:12px;}
+  .preview-col .export-all-row .export-btn{padding:9px 0;font-size:12px;}
+  .preview-col .export-hint{font-size:9px;line-height:1.5;}
 
   /* 觸控操作區放大 */
   .nav-btn{width:44px;height:44px;font-size:20px;}
