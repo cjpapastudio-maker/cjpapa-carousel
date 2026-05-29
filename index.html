@@ -648,7 +648,7 @@ let currentStyle = 'A';
 let cur = 0;
 let mode = 'carousel';
 
-const HL_DEFAULT = 1.55, BODY_DEFAULT = 0.80;
+const HL_DEFAULT = 1.25, BODY_DEFAULT = 0.66;
 
 /* Per-style independent state */
 const STYLES = {
@@ -1120,8 +1120,8 @@ function renderPanel(){
   const hlPct=Math.round((ps.hlSize/HL_DEFAULT)*100);
   const bodyPct=Math.round((ps.bodySize/BODY_DEFAULT)*100);
   html+=`<div class="font-slider-group"><div class="group-title">文字大小</div>
-    <div class="fsr"><label>主標題</label><input type="range" min="60" max="200" value="${hlPct}" oninput="updateFontSize('hl',${cur},this.value,this.nextElementSibling)"><span>${hlPct}%</span></div>
-    <div class="fsr"><label>內文</label><input type="range" min="60" max="200" value="${bodyPct}" oninput="updateFontSize('body',${cur},this.value,this.nextElementSibling)"><span>${bodyPct}%</span></div>
+    <div class="fsr"><label>主標題</label><input type="range" min="30" max="200" value="${hlPct}" oninput="updateFontSize('hl',${cur},this.value,this.nextElementSibling)"><span>${hlPct}%</span></div>
+    <div class="fsr"><label>內文</label><input type="range" min="30" max="200" value="${bodyPct}" oninput="updateFontSize('body',${cur},this.value,this.nextElementSibling)"><span>${bodyPct}%</span></div>
     <div style="display:flex;justify-content:flex-end;margin-top:2px;"><button class="fsr-reset" onclick="resetFontSize(${cur})">還原預設</button></div>
   </div>`;
 
