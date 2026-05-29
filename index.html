@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CJPAPA 西街阿爸｜輪播貼文框架</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#C8A882">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="輪播框架">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+@font-face{font-family:'DuoDuo';src:url('duoduofont (1).ttf') format('truetype');font-weight:normal;font-style:normal;}
+@font-face{font-family:'MeiYi';src:url('meiyifont-monospaced (2).ttf') format('truetype');font-weight:normal;font-style:normal;}
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --cream:#FAF8F5;--ink:#1A1A18;--ink-soft:#5A5A56;--ink-muted:#9A9A94;
+  --gold:#C8A882;--border:#E8E4DE;--panel-bg:#F5F2ED;--page-bg:#ECEAE4;
+  --s-bg:#FAF8F5;--s-text:#1A1A18;--s-text-soft:#5A5A56;--s-text-muted:#9A9A94;--s-accent:#C8A882;
+}
+
+/* ── Font picker ── */
+.font-picker-row{display:flex;gap:4px;margin-top:4px;}
+.fp-btn{padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:white;font-size:10px;letter-spacing:0.06em;cursor:pointer;color:var(--ink-soft);transition:all 0.12s;white-space:nowrap;}
+.fp-btn:hover{border-color:var(--gold);color:var(--ink);}
+.fp-btn.active{background:var(--gold);border-color:var(--gold);color:white;}
+.fp-btn.font-noto{font-family:'Noto Serif TC',serif;}
+.fp-btn.font-duoduo{font-family:'DuoDuo',sans-serif;}
+.fp-btn.font-meiyi{font-family:'MeiYi',monospace;}
+
+/* footer color picker */
+.fc-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;}
+.fc-swatch{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform 0.1s,border 0.1s;flex-shrink:0;}
+.fc-swatch:hover{transform:scale(1.15);}
+.fc-swatch.active{border-color:var(--ink)!important;}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--page-bg);min-height:100vh;color:var(--ink);}
+
+.app-header{text-align:center;padding:1.8rem 1rem 0.8rem;}
+.app-header h1{font-family:'Noto Serif TC',serif;font-weight:300;font-size:1rem;letter-spacing:0.25em;color:var(--ink-soft);margin-bottom:4px;}
+.app-header p{font-size:11px;letter-spacing:0.15em;color:var(--ink-muted);}
+
+/* ── Style Selector ── */
+.style-selector{display:flex;justify-content:center;gap:10px;padding:1rem 1rem 0.5rem;flex-wrap:wrap;}
+.style-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 20px;border:1px solid var(--border);background:white;border-radius:10px;cursor:pointer;transition:all 0.15s;min-width:130px;}
+.style-btn:hover{border-color:var(--gold);background:#FDFAF7;}
+.style-btn.active{border-color:var(--gold);background:#FDFAF7;box-shadow:0 0 0 2px var(--gold);}
+.style-btn .s-name{font-size:12px;font-weight:500;letter-spacing:0.1em;color:var(--ink-soft);}
+.style-btn .s-desc{font-size:10px;letter-spacing:0.08em;color:var(--ink-muted);}
+.style-btn .s-pages{font-size:9px;letter-spacing:0.1em;color:var(--gold);}
+
+/* ── Mode Tabs ── */
+.mode-tabs{display:flex;justify-content:center;margin-bottom:1.2rem;}
+.mode-tab{padding:7px 22px;font-size:12px;letter-spacing:0.12em;border:1px solid var(--border);background:white;cursor:pointer;color:var(--ink-muted);transition:all 0.15s;}
+.mode-tab:first-child{border-radius:20px 0 0 20px;}
+.mode-tab:last-child{border-radius:0 20px 20px 0;}
+.mode-tab.active{background:var(--gold);border-color:var(--gold);color:white;}
+
+.main{display:flex;gap:1.5rem;justify-content:center;align-items:flex-start;flex-wrap:wrap;padding:0 1.5rem 4rem;}
+
+/* ── Canvas ── */
+.preview-col{display:flex;flex-direction:column;align-items:center;gap:1rem;}
+.canvas-wrap{position:relative;overflow:hidden;background:var(--s-bg);flex-shrink:0;user-select:none;}
+.canvas-wrap.carousel{width:500px;height:500px;}
+.canvas-wrap.story{width:281px;height:500px;}
+
+.bg-img-layer{position:absolute;background-repeat:no-repeat;background-size:cover;pointer-events:none;z-index:0;will-change:transform;transition:opacity 0.25s;}
+.bg-overlay{position:absolute;inset:0;pointer-events:none;z-index:1;transition:background 0.3s;}
+.drag-hint{position:absolute;inset:0;z-index:3;border:2px dashed rgba(200,168,130,0.6);pointer-events:none;opacity:0;transition:opacity 0.2s;}
+.canvas-wrap.drag-active .drag-hint{opacity:1;}
+.drag-cursor{cursor:grab;}
+.drag-cursor:active{cursor:grabbing;}
+
+/* ── Shared slide base ── */
+.slide{position:absolute;inset:0;display:none;flex-direction:column;z-index:2;background:transparent;}
+.slide.active{display:flex;}
+
+/* ══ STYLE A — 米白日系 ══ */
+.sa .s-inner{flex:1;padding:36px 44px;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+.sa .s-pgnum{position:absolute;top:28px;right:36px;font-family:'Noto Sans TC',sans-serif;font-size:11px;font-weight:300;letter-spacing:0.15em;color:var(--s-text-muted);}
+.sa .s-tag{font-family:var(--font-tag,'Noto Sans TC',sans-serif);font-size:11px;font-weight:400;letter-spacing:0.22em;color:var(--page-tag-color,var(--s-accent));margin-bottom:20px;}
+.sa .s-hl{font-family:var(--font-hl,'Noto Serif TC',serif);font-weight:300;line-height:1.85;letter-spacing:0.05em;color:var(--page-hl-color,var(--s-text));white-space:pre-line;font-size:var(--hl-size,1.55rem);}
+.sa .s-hl.sm{font-size:var(--hl-sm-size,1.2rem);}
+.sa .s-body{font-family:var(--font-body,'Noto Serif TC',serif);font-weight:300;line-height:2.1;letter-spacing:0.08em;color:var(--page-body-color,var(--s-text-soft));white-space:pre-line;font-size:var(--body-size,0.8rem);}
+.sa .s-div{width:44px;height:1px;background:var(--page-tag-color,var(--s-accent));margin:18px 0;flex-shrink:0;}
+.sa .s-div.cx{margin:18px auto;}
+.sa .s-footer{margin-top:auto;padding-top:12px;display:flex;justify-content:space-between;font-family:var(--font-footer,'Noto Sans TC',sans-serif);font-size:11px;font-weight:300;letter-spacing:0.15em;color:var(--footer-color,var(--s-text-muted));}
+.sa .s-center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;}
+.sa .s-quote{font-family:var(--font-hl,'Noto Serif TC',serif);font-size:5rem;font-weight:300;color:var(--page-tag-color,var(--s-accent));opacity:0.45;line-height:1;margin-bottom:-12px;}
+.sa .s-cta-tag{font-family:var(--font-cta,'Noto Sans TC',sans-serif);font-size:11px;font-weight:400;letter-spacing:0.22em;color:var(--page-cta-color,var(--s-accent));margin-top:16px;}
+
+/* ══ STYLE B — 對話卡片版 ══ */
+.sb{background:transparent;}
+.sb .s-inner{flex:1;padding:28px 32px;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+.sb .s-pgnum{position:absolute;top:20px;right:24px;font-family:'Noto Sans TC',sans-serif;font-size:11px;font-weight:300;letter-spacing:0.15em;color:var(--s-text-muted);}
+.sb .s-tag{font-family:var(--font-tag,'Noto Sans TC',sans-serif);font-size:11px;font-weight:400;letter-spacing:0.22em;color:var(--page-tag-color,var(--s-accent));margin-bottom:16px;}
+.sb .s-hl{font-family:var(--font-hl,'Noto Serif TC',serif);font-weight:300;line-height:1.85;letter-spacing:0.05em;color:var(--page-hl-color,var(--s-text));white-space:pre-line;font-size:var(--hl-size,1.55rem);}
+.sb .s-hl.sm{font-size:var(--hl-sm-size,1.2rem);}
+.sb .s-body{font-family:var(--font-body,'Noto Serif TC',serif);font-weight:300;line-height:2.0;letter-spacing:0.06em;color:var(--page-body-color,var(--s-text-soft));white-space:pre-line;font-size:var(--body-size,0.8rem);}
+.sb .s-div{width:36px;height:1px;background:var(--page-tag-color,var(--s-accent));margin:14px 0;flex-shrink:0;}
+.sb .s-footer{margin-top:auto;padding-top:12px;display:flex;justify-content:space-between;font-family:var(--font-footer,'Noto Sans TC',sans-serif);font-size:11px;font-weight:300;letter-spacing:0.15em;color:var(--footer-color,var(--s-text-muted));}
+.sb .s-center{flex:1;display:flex;flex-direction:column;justify-content:center;}
+.sb .s-cta-tag{font-family:var(--font-cta,'Noto Sans TC',sans-serif);font-size:11px;font-weight:400;letter-spacing:0.22em;color:var(--page-cta-color,var(--s-accent));margin-top:14px;}
+
+/* Style B: quote bubble */
+.sb .b-bubble{background:var(--panel-bg);border-radius:4px 16px 16px 16px;padding:16px 18px;position:relative;margin-bottom:6px;}
+.sb .b-bubble::before{content:'';position:absolute;top:-10px;left:0;border-right:12px solid var(--panel-bg);border-top:10px solid transparent;}
+.sb .b-bubble-text{font-family:var(--font-hl,'Noto Serif TC',serif);font-weight:300;font-size:var(--hl-sm-size,1.2rem);line-height:1.85;color:var(--page-hl-color,var(--s-text));white-space:pre-line;}
+.sb .b-speaker{font-family:var(--font-tag,'Noto Sans TC',sans-serif);font-size:10px;letter-spacing:0.15em;color:var(--page-tag-color,var(--s-accent));text-align:right;margin-top:6px;}
+
+/* Style B: role cards */
+.sb .b-roles{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
+.sb .b-role{display:flex;align-items:flex-start;gap:10px;}
+.sb .b-role-dot{width:20px;height:20px;border-radius:50%;flex-shrink:0;margin-top:2px;}
+.sb .b-role-label{font-family:var(--font-tag,'Noto Sans TC',sans-serif);font-size:10px;letter-spacing:0.12em;color:var(--page-body-color,var(--s-text-muted));margin-bottom:2px;}
+.sb .b-role-text{font-family:var(--font-body,'Noto Serif TC',serif);font-weight:300;font-size:var(--body-size,0.8rem);line-height:1.7;color:var(--page-hl-color,var(--s-text));white-space:pre-line;}
+
+/* ══ STYLE C — 深墨版 ══ */
+.sc{background:transparent;}
+.sc .s-inner{flex:1;padding:36px 44px 36px 56px;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+.sc .s-inner::before{content:'';position:absolute;left:36px;top:50%;transform:translateY(-50%);width:2px;height:48px;background:var(--page-tag-color,var(--s-accent));}
+.sc .s-pgnum{position:absolute;top:28px;right:36px;font-family:'Noto Sans TC',sans-serif;font-size:11px;font-weight:300;letter-spacing:0.15em;color:var(--s-text-muted);}
+.sc .s-tag{font-family:var(--font-tag,'Noto Sans TC',sans-serif);font-size:11px;font-weight:400;letter-spacing:0.25em;color:var(--page-tag-color,var(--s-accent));margin-bottom:20px;}
+.sc .s-hl{font-family:var(--font-hl,'Noto Serif TC',serif);font-weight:300;line-height:1.85;letter-spacing:0.05em;color:var(--page-hl-color,var(--s-text));white-space:pre-line;font-size:var(--hl-size,1.55rem);}
+.sc .s-hl.sm{font-size:var(--hl-sm-size,1.2rem);}
+.sc .s-body{font-family:var(--font-body,'Noto Serif TC',serif);font-weight:300;line-height:2.1;letter-spacing:0.08em;color:var(--page-body-color,var(--s-text-soft));white-space:pre-line;font-size:var(--body-size,0.8rem);}
+.sc .s-div{width:36px;height:0.5px;background:var(--page-tag-color,var(--s-accent));margin:14px 0;flex-shrink:0;}
+.sc .s-div.cx{margin:14px auto;}
+.sc .s-footer{margin-top:auto;padding-top:12px;display:flex;justify-content:space-between;font-family:var(--font-footer,'Noto Sans TC',sans-serif);font-size:11px;font-weight:300;letter-spacing:0.15em;color:var(--footer-color,var(--s-text-muted));}
+.sc .s-center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;}
+.sc .s-center::before{display:none;} /* center pages don't show the side line */
+.sc .s-quote{font-family:var(--font-hl,'Noto Serif TC',serif);font-size:5rem;font-weight:300;color:var(--page-tag-color,var(--s-accent));opacity:0.45;line-height:1;margin-bottom:-12px;}
+.sc .s-cta-tag{font-family:var(--font-cta,'Noto Sans TC',sans-serif);font-size:11px;font-weight:400;letter-spacing:0.25em;color:var(--page-cta-color,var(--s-accent));margin-top:16px;}
+/* Hide the accent line on center-aligned pages */
+.sc.center-page .s-inner::before{display:none;}
+.sc.center-page .s-inner{padding:36px 44px;}
+
+/* ── Content image (shared) ── */
+.c-img-container{position:relative;overflow:hidden;flex-shrink:0;background:#EAE6DF;cursor:grab;}
+.c-img-container:active{cursor:grabbing;}
+.c-img-layer{position:absolute;background-repeat:no-repeat;background-size:cover;pointer-events:none;z-index:0;will-change:transform;transition:opacity 0.2s;}
+.c-img-upload{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px dashed #C8B89A;cursor:pointer;transition:background 0.15s;pointer-events:all;}
+.c-img-upload:hover{background:rgba(200,168,130,0.08);}
+.c-img-upload .ph{font-family:'Noto Sans TC',sans-serif;font-size:10px;letter-spacing:0.12em;color:#A89880;text-align:center;line-height:2;pointer-events:none;}
+.c-img-upload .ph-icon{font-size:18px;display:block;color:var(--gold);margin-bottom:2px;}
+.c-img-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.c-img-upload.has-img{inset:auto;bottom:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(250,248,245,0.85);border:1px solid rgba(200,168,130,0.6);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.c-img-upload.has-img .ph{display:none;}
+.c-img-upload.has-img::after{content:'↺';font-size:13px;color:var(--gold);pointer-events:none;}
+.c-img-upload.has-img input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.c-drag-hint{position:absolute;inset:0;z-index:1;border:2px dashed rgba(200,168,130,0.7);pointer-events:none;opacity:0;transition:opacity 0.15s;}
+.c-img-container.drag-active .c-drag-hint{opacity:1;}
+
+/* ── nav ── */
+.nav-row{display:flex;align-items:center;gap:10px;}
+.nav-btn{width:36px;height:36px;border:1px solid var(--border);background:white;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);transition:background 0.12s;}
+.nav-btn:hover{background:#F0EDE7;}
+.dots{display:flex;gap:6px;}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--border);cursor:pointer;transition:background 0.15s,transform 0.15s;}
+.dot.on{background:var(--gold);transform:scale(1.4);}
+.nav-label{font-size:11px;color:var(--ink-muted);letter-spacing:0.1em;text-align:center;}
+
+/* ── export ── */
+.export-btn{width:100%;padding:11px 0;background:var(--ink);color:white;border:none;border-radius:8px;font-family:'Noto Sans TC',sans-serif;font-size:12px;font-weight:500;letter-spacing:0.18em;cursor:pointer;transition:background 0.15s,opacity 0.15s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.export-btn:hover{background:#333330;}
+.export-btn:disabled{opacity:0.45;cursor:not-allowed;}
+.export-btn.gold-btn{background:var(--gold);}
+.export-btn.gold-btn:hover{background:#B8946E;}
+.export-hint{font-size:10px;letter-spacing:0.06em;color:var(--ink-muted);text-align:center;line-height:1.8;}
+.export-hint strong{color:var(--ink-soft);}
+.export-all-row{width:100%;display:flex;flex-direction:column;gap:8px;}
+
+/* ── modal ── */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+.modal-backdrop.open{opacity:1;pointer-events:all;}
+.modal{background:white;border-radius:14px;padding:1.8rem;width:540px;max-width:92vw;max-height:88vh;display:flex;flex-direction:column;gap:1rem;box-shadow:0 20px 60px rgba(0,0,0,0.18);}
+.modal-title{font-family:'Noto Serif TC',serif;font-weight:300;font-size:1rem;letter-spacing:0.12em;color:var(--ink);}
+.modal-desc{font-size:11px;line-height:1.9;color:var(--ink-muted);letter-spacing:0.04em;}
+.modal-desc code{font-family:monospace;font-size:11px;background:var(--panel-bg);padding:1px 5px;border-radius:3px;color:var(--ink-soft);}
+.modal textarea{font-family:monospace;font-size:12px;line-height:1.7;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--panel-bg);color:var(--ink);resize:vertical;min-height:240px;width:100%;}
+.modal textarea:focus{outline:none;border-color:var(--gold);background:white;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;}
+.modal-btn{padding:9px 20px;border:none;border-radius:8px;font-family:'Noto Sans TC',sans-serif;font-size:12px;font-weight:500;letter-spacing:0.12em;cursor:pointer;transition:background 0.12s;}
+.modal-btn.cancel{background:var(--panel-bg);color:var(--ink-soft);}
+.modal-btn.cancel:hover{background:var(--border);}
+.modal-btn.confirm{background:var(--gold);color:white;}
+.modal-btn.confirm:hover{background:#B8946E;}
+.modal-feedback{font-size:11px;color:var(--gold);letter-spacing:0.06em;flex:1;}
+.import-btn{width:100%;padding:10px 0;background:white;color:var(--ink-soft);border:1px solid var(--border);border-radius:8px;font-family:'Noto Sans TC',sans-serif;font-size:12px;font-weight:500;letter-spacing:0.15em;cursor:pointer;transition:all 0.12s;display:flex;align-items:center;justify-content:center;gap:6px;}
+.import-btn:hover{background:var(--panel-bg);color:var(--ink);border-color:var(--gold);}
+
+/* ── edit panel ── */
+.edit-col{width:300px;display:flex;flex-direction:column;gap:1rem;flex-shrink:0;}
+.panel{background:white;border:1px solid var(--border);border-radius:10px;padding:1.2rem;display:flex;flex-direction:column;gap:0.85rem;}
+.panel-title{font-size:12px;font-weight:500;letter-spacing:0.1em;color:var(--ink-soft);padding-bottom:0.6rem;border-bottom:1px solid var(--border);}
+.panel-title em{font-style:normal;font-weight:300;color:var(--ink-muted);margin-left:6px;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:10px;letter-spacing:0.12em;color:var(--ink-muted);}
+.field textarea,.field input[type=text]{font-family:'Noto Serif TC',serif;font-size:13px;line-height:1.7;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--panel-bg);color:var(--ink);resize:vertical;width:100%;transition:border 0.12s;}
+.field textarea:focus,.field input[type=text]:focus{outline:none;border-color:var(--gold);background:white;}
+.field textarea{min-height:72px;}
+.font-slider-group{display:flex;flex-direction:column;gap:8px;padding:10px 12px;background:var(--panel-bg);border-radius:8px;}
+.font-slider-group .group-title{font-size:10px;letter-spacing:0.15em;color:var(--ink-muted);font-weight:500;margin-bottom:2px;}
+.fsr{display:flex;align-items:center;gap:8px;}
+.fsr label{font-size:10px;letter-spacing:0.08em;color:var(--ink-muted);width:52px;flex-shrink:0;}
+.fsr input[type=range]{flex:1;accent-color:var(--gold);}
+.fsr span{font-size:11px;color:var(--ink-soft);min-width:36px;text-align:right;}
+.fsr-reset{font-size:10px;color:var(--ink-muted);background:none;border:none;cursor:pointer;padding:0;letter-spacing:0.06em;text-decoration:underline;text-underline-offset:2px;}
+.tip-box{background:#FBF8F3;border-left:2.5px solid var(--gold);border-radius:0 6px 6px 0;padding:9px 11px;font-size:11px;line-height:1.8;color:var(--ink-muted);letter-spacing:0.03em;}
+.color-section-title{font-size:10px;letter-spacing:0.18em;color:var(--ink-muted);margin-bottom:8px;font-weight:500;}
+.color-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2.5px solid transparent;transition:transform 0.12s,border 0.12s;flex-shrink:0;}
+.color-swatch:hover{transform:scale(1.15);}
+.color-swatch.selected{border-color:var(--ink)!important;}
+.bg-upload-btn{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px dashed var(--border);border-radius:6px;cursor:pointer;background:var(--panel-bg);font-size:11px;letter-spacing:0.08em;color:var(--ink-soft);transition:background 0.12s;position:relative;overflow:hidden;}
+.bg-upload-btn:hover{background:#EDE9E2;}
+.bg-upload-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.slider-row{display:flex;align-items:center;gap:10px;margin-top:4px;}
+.slider-row label{font-size:10px;letter-spacing:0.1em;color:var(--ink-muted);white-space:nowrap;width:60px;}
+.slider-row input[type=range]{flex:1;accent-color:var(--gold);}
+.slider-row span{font-size:11px;color:var(--ink-soft);min-width:34px;text-align:right;}
+.drag-info{font-size:10px;color:var(--ink-muted);letter-spacing:0.06em;line-height:1.8;margin-top:4px;padding:6px 10px;background:#FBF8F3;border-radius:4px;}
+.reset-pos-btn{font-size:10px;letter-spacing:0.1em;color:var(--ink-muted);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;transition:background 0.1s;}
+.reset-pos-btn:hover{background:var(--panel-bg);}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;display:inline-block;}
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>CJPAPA 西街阿爸</h1>
+  <p>輪播貼文框架｜選擇版型・編輯文字・匯出高解析度 PNG</p>
+</div>
+
+<!-- 版型選擇器 -->
+<div class="style-selector">
+  <div class="style-btn active" id="styleBtnA" onclick="switchStyle('A')">
+    <div class="s-name">版型 A｜米白日系</div>
+    <div class="s-desc">自然光・留白・情感紀錄</div>
+    <div class="s-pages">7 頁</div>
+  </div>
+  <div class="style-btn" id="styleBtnB" onclick="switchStyle('B')">
+    <div class="s-name">版型 B｜對話卡片</div>
+    <div class="s-desc">幽默・家庭分工・有趣</div>
+    <div class="s-pages">6 頁</div>
+  </div>
+  <div class="style-btn" id="styleBtnC" onclick="switchStyle('C')">
+    <div class="s-name">版型 C｜深墨版</div>
+    <div class="s-desc">深度敘事・十週年紀錄</div>
+    <div class="s-pages">7 頁</div>
+  </div>
+</div>
+
+<div class="mode-tabs" style="margin-top:1rem;">
+  <div class="mode-tab active" onclick="setMode('carousel')">輪播貼文　1080×1080</div>
+  <div class="mode-tab" onclick="setMode('story')">限時動態　1080×1920</div>
+</div>
+
+<div class="main">
+  <div class="preview-col">
+    <div class="canvas-wrap carousel" id="canvasWrap">
+      <div class="bg-img-layer" id="bgImgLayer"></div>
+      <div class="bg-overlay" id="bgOverlay"></div>
+      <div class="drag-hint"></div>
+
+      <!-- ══ STYLE A SLIDES (7頁) ══ -->
+      <div class="slide sa active" id="slide-0">
+        <div class="s-inner">
+          <div class="s-pgnum">1 / 7</div>
+          <div class="s-tag" id="a-tag-0"></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl" id="a-hl-0"></div>
+          </div>
+          <div class="s-div"></div>
+          <div class="s-footer"><span id="a-footer0-l"></span><span id="a-footer0-r"></span></div>
+        </div>
+      </div>
+      <div class="slide sa" id="slide-1">
+        <div class="c-img-container" id="cbox-1" style="height:52%;">
+          <div class="c-img-layer" id="clayer-1"></div>
+          <div class="c-drag-hint"></div>
+          <div class="c-img-upload" id="cupload-1">
+            <div class="ph"><span class="ph-icon">＋</span>點擊上傳照片</div>
+            <input type="file" accept="image/*" onchange="loadContentImg(this,1)">
+          </div>
+        </div>
+        <div class="s-inner" style="flex:0 0 48%;padding-top:20px;">
+          <div class="s-hl sm" id="a-hl-1"></div>
+          <div class="s-div"></div>
+          <div class="s-body" id="a-bd-1"></div>
+        </div>
+      </div>
+      <div class="slide sa" id="slide-2">
+        <div class="s-inner">
+          <div class="s-pgnum">3 / 7</div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl sm" id="a-hl-2"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="a-bd-2"></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sa" id="slide-3">
+        <div class="s-inner">
+          <div class="s-pgnum">4 / 7</div>
+          <div class="s-center">
+            <div class="s-quote">"</div>
+            <div class="s-hl sm" id="a-hl-3" style="text-align:center;"></div>
+            <div class="s-div cx"></div>
+            <div class="s-body" id="a-bd-3" style="text-align:center;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sa" id="slide-4">
+        <div class="c-img-container" id="cbox-4" style="height:48%;">
+          <div class="c-img-layer" id="clayer-4"></div>
+          <div class="c-drag-hint"></div>
+          <div class="c-img-upload" id="cupload-4">
+            <div class="ph"><span class="ph-icon">＋</span>點擊上傳照片</div>
+            <input type="file" accept="image/*" onchange="loadContentImg(this,4)">
+          </div>
+        </div>
+        <div class="s-inner" style="flex:0 0 52%;padding-top:20px;">
+          <div class="s-hl sm" id="a-hl-4"></div>
+          <div class="s-div"></div>
+          <div class="s-body" id="a-bd-4"></div>
+        </div>
+      </div>
+      <div class="slide sa" id="slide-5">
+        <div class="s-inner">
+          <div class="s-pgnum">6 / 7</div>
+          <div class="s-tag" id="a-tag-5"></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl sm" id="a-hl-5"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="a-bd-5" style="color:var(--s-text);"></div>
+          </div>
+          <div class="s-footer"><span id="a-footer5-l"></span><span id="a-footer5-r"></span></div>
+        </div>
+      </div>
+      <div class="slide sa" id="slide-6">
+        <div class="s-inner">
+          <div class="s-pgnum">7 / 7</div>
+          <div class="s-center">
+            <div class="s-hl sm" id="a-hl-6"></div>
+            <div class="s-div cx"></div>
+            <div class="s-body" id="a-bd-6" style="text-align:center;letter-spacing:0;word-spacing:0;"></div>
+            <div class="s-cta-tag" id="a-cta-6"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ STYLE B SLIDES (6頁) ══ -->
+      <div class="slide sb" id="b-slide-0">
+        <div class="s-inner">
+          <div class="s-pgnum">1 / 6</div>
+          <div class="s-tag" id="b-tag-0"></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl" id="b-hl-0"></div>
+          </div>
+          <div class="s-div"></div>
+          <div class="s-footer"><span id="b-footer0-l"></span><span id="b-footer0-r"></span></div>
+        </div>
+      </div>
+      <div class="slide sb" id="b-slide-1">
+        <div class="s-inner">
+          <div class="s-pgnum">2 / 6</div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px;">
+            <div class="b-bubble">
+              <div class="b-bubble-text" id="b-hl-1"></div>
+            </div>
+            <div class="b-speaker" id="b-speaker-1"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="b-bd-1"></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sb" id="b-slide-2">
+        <div class="s-inner">
+          <div class="s-pgnum">3 / 6</div>
+          <div class="s-tag" id="b-section-title-2"></div>
+          <div class="b-roles" id="b-roles-2">
+            <div class="b-role">
+              <div class="b-role-dot" style="background:var(--s-accent);"></div>
+              <div><div class="b-role-label" id="b-role1-label"></div><div class="b-role-text" id="b-role1-text"></div></div>
+            </div>
+            <div class="b-role">
+              <div class="b-role-dot" style="background:#B88065;"></div>
+              <div><div class="b-role-label" id="b-role2-label"></div><div class="b-role-text" id="b-role2-text"></div></div>
+            </div>
+            <div class="b-role">
+              <div class="b-role-dot" style="background:#9A9A94;"></div>
+              <div><div class="b-role-label" id="b-role3-label"></div><div class="b-role-text" id="b-role3-text"></div></div>
+            </div>
+            <div class="b-role">
+              <div class="b-role-dot" style="background:#5A5A56;"></div>
+              <div><div class="b-role-label" id="b-role4-label"></div><div class="b-role-text" id="b-role4-text"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sb" id="b-slide-3">
+        <div class="c-img-container" id="cbox-b3" style="height:55%;">
+          <div class="c-img-layer" id="clayer-b3"></div>
+          <div class="c-drag-hint"></div>
+          <div class="c-img-upload" id="cupload-b3">
+            <div class="ph"><span class="ph-icon">＋</span>點擊上傳照片</div>
+            <input type="file" accept="image/*" onchange="loadContentImg(this,'b3')">
+          </div>
+        </div>
+        <div class="s-inner" style="flex:0 0 45%;padding-top:18px;">
+          <div class="s-hl sm" id="b-hl-3"></div>
+          <div class="s-div"></div>
+          <div class="s-body" id="b-bd-3"></div>
+        </div>
+      </div>
+      <div class="slide sb" id="b-slide-4">
+        <div class="s-inner">
+          <div class="s-pgnum">5 / 6</div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl sm" id="b-hl-4"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="b-bd-4"></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sb" id="b-slide-5">
+        <div class="s-inner">
+          <div class="s-pgnum">6 / 6</div>
+          <div class="s-tag" id="b-tag-5"></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl sm" id="b-hl-5"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="b-bd-5"></div>
+            <div class="s-cta-tag" id="b-cta-5"></div>
+          </div>
+          <div class="s-footer"><span id="b-footer5-l"></span><span id="b-footer5-r"></span></div>
+        </div>
+      </div>
+
+      <!-- ══ STYLE C SLIDES (7頁) — 深墨版 ══ -->
+      <div class="slide sc" id="c-slide-0">
+        <div class="s-inner">
+          <div class="s-pgnum">1 / 7</div>
+          <div class="s-tag" id="c-tag-0"></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl" id="c-hl-0"></div>
+          </div>
+          <div class="s-div"></div>
+          <div class="s-footer"><span id="c-footer0-l"></span><span id="c-footer0-r"></span></div>
+        </div>
+      </div>
+      <div class="slide sc" id="c-slide-1">
+        <div class="c-img-container" id="cbox-c1" style="height:52%;">
+          <div class="c-img-layer" id="clayer-c1"></div>
+          <div class="c-drag-hint"></div>
+          <div class="c-img-upload" id="cupload-c1">
+            <div class="ph"><span class="ph-icon">＋</span>點擊上傳照片</div>
+            <input type="file" accept="image/*" onchange="loadContentImg(this,'c1')">
+          </div>
+        </div>
+        <div class="s-inner" style="flex:0 0 48%;padding-top:20px;">
+          <div class="s-hl sm" id="c-hl-1"></div>
+          <div class="s-div"></div>
+          <div class="s-body" id="c-bd-1"></div>
+        </div>
+      </div>
+      <div class="slide sc" id="c-slide-2">
+        <div class="s-inner">
+          <div class="s-pgnum">3 / 7</div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl sm" id="c-hl-2"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="c-bd-2"></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sc center-page" id="c-slide-3">
+        <div class="s-inner">
+          <div class="s-pgnum">4 / 7</div>
+          <div class="s-center">
+            <div class="s-quote">"</div>
+            <div class="s-hl sm" id="c-hl-3" style="text-align:center;"></div>
+            <div class="s-div cx"></div>
+            <div class="s-body" id="c-bd-3" style="text-align:center;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="slide sc" id="c-slide-4">
+        <div class="c-img-container" id="cbox-c4" style="height:48%;">
+          <div class="c-img-layer" id="clayer-c4"></div>
+          <div class="c-drag-hint"></div>
+          <div class="c-img-upload" id="cupload-c4">
+            <div class="ph"><span class="ph-icon">＋</span>點擊上傳照片</div>
+            <input type="file" accept="image/*" onchange="loadContentImg(this,'c4')">
+          </div>
+        </div>
+        <div class="s-inner" style="flex:0 0 52%;padding-top:20px;">
+          <div class="s-hl sm" id="c-hl-4"></div>
+          <div class="s-div"></div>
+          <div class="s-body" id="c-bd-4"></div>
+        </div>
+      </div>
+      <div class="slide sc" id="c-slide-5">
+        <div class="s-inner">
+          <div class="s-pgnum">6 / 7</div>
+          <div class="s-tag" id="c-tag-5"></div>
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <div class="s-hl sm" id="c-hl-5"></div>
+            <div class="s-div"></div>
+            <div class="s-body" id="c-bd-5" style="color:var(--page-hl-color,var(--s-text));"></div>
+          </div>
+          <div class="s-footer"><span id="c-footer5-l"></span><span id="c-footer5-r"></span></div>
+        </div>
+      </div>
+      <div class="slide sc center-page" id="c-slide-6">
+        <div class="s-inner">
+          <div class="s-pgnum">7 / 7</div>
+          <div class="s-center">
+            <div class="s-hl sm" id="c-hl-6" style="text-align:center;"></div>
+            <div class="s-div cx"></div>
+            <div class="s-body" id="c-bd-6" style="text-align:center;letter-spacing:0;word-spacing:0;"></div>
+            <div class="s-cta-tag" id="c-cta-6"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /canvas-wrap -->
+
+    <div class="nav-row">
+      <button class="nav-btn" onclick="go(-1)">‹</button>
+      <div class="dots" id="dots"></div>
+      <button class="nav-btn" onclick="go(1)">›</button>
+    </div>
+    <div class="nav-label" id="navLabel">P1</div>
+    <button class="export-btn" id="exportOneBtn" onclick="exportOne()">↓ 匯出這一頁</button>
+    <div class="export-all-row">
+      <button class="export-btn gold-btn" id="exportAllBtn" onclick="exportAll()">↓ 全部匯出</button>
+      <div class="export-hint" id="exportProgress"></div>
+    </div>
+  </div>
+
+  <div class="edit-col">
+    <button class="import-btn" onclick="openImport()">⬇︎ 批次匯入文案</button>
+    <div class="panel" id="colorPanel">
+      <div class="panel-title">配色</div>
+      <div><div class="color-section-title">底色</div><div class="color-row" id="bgSwatches"></div></div>
+      <div><div class="color-section-title">文字顏色</div><div class="color-row" id="textSwatches"></div></div>
+      <div><div class="color-section-title">強調色</div><div class="color-row" id="accentSwatches"></div></div>
+    </div>
+    <div id="editPanel"></div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-backdrop" id="importBackdrop" onclick="handleBackdropClick(event)">
+  <div class="modal">
+    <div class="modal-title">批次匯入文案</div>
+    <div class="modal-desc" id="importDesc"></div>
+    <textarea id="importTextarea" placeholder="把文案貼在這裡…"></textarea>
+    <div class="modal-actions">
+      <div class="modal-feedback" id="importFeedback"></div>
+      <button class="modal-btn cancel" onclick="closeImport()">取消</button>
+      <button class="modal-btn confirm" onclick="runImport()">填入編輯器</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ BRAND COLOURS ══ */
+const BRAND={
+  bg:[{hex:'#FAF8F5',label:'米白'},{hex:'#F2EFE9',label:'暖象牙'},{hex:'#333330',label:'深墨'},{hex:'#4A5D46',label:'森林綠'},{hex:'#B88065',label:'磚陶'},{hex:'#FFFFFF',label:'純白'}],
+  text:[{hex:'#1A1A18',label:'深墨'},{hex:'#333330',label:'柔墨'},{hex:'#FAF8F5',label:'米白'},{hex:'#F2EFE9',label:'象牙'},{hex:'#4A5D46',label:'森林綠'}],
+  accent:[{hex:'#C8A882',label:'品牌金'},{hex:'#B88065',label:'磚陶'},{hex:'#4A5D46',label:'森林綠'},{hex:'#9A9A94',label:'霧灰'},{hex:'#FAF8F5',label:'米白'}]
+};
+
+/* ══ STYLE STATE ══ */
+let currentStyle = 'A';
+let cur = 0;
+let mode = 'carousel';
+
+const HL_DEFAULT = 1.55, BODY_DEFAULT = 0.80;
+
+/* Per-style independent state */
+const STYLES = {
+  A: {
+    pageCount: 7,
+    pageState: Array.from({length:7}, ()=>({ox:0,oy:0,bgImage:null,overlayOpacity:45,zoom:100,hlSize:HL_DEFAULT,bodySize:BODY_DEFAULT,
+      fontState:{hl:'noto',body:'noto',tag:'noto',footer:'noto',cta:'noto'},
+      footerColor:'',
+      textColors:{hl:'',body:'',tag:'',cta:''}})),
+    contentImg: {
+      1:{image:null,ox:0,oy:0,zoom:100,naturalW:1,naturalH:1},
+      4:{image:null,ox:0,oy:0,zoom:100,naturalW:1,naturalH:1}
+    },
+    theme:{bg:'#FAF8F5',text:'#1A1A18',textSoft:'',textMuted:'',accent:'#C8A882'},
+    bgNatural:{},
+    prefix:'a-',
+    slidePrefix:'slide-',
+    data:[
+      {label:'封面頁',tip:'主標題留白。上傳底圖讓封面有照片背景。',fields:[{key:'a-tag-0',label:'頂部標籤',tag:'input'},{key:'a-hl-0',label:'主標題',tag:'textarea'},{key:'a-footer0-l',label:'底部左側',tag:'input'},{key:'a-footer0-r',label:'底部右側',tag:'input'}]},
+      {label:'圖文頁 P2',tip:'點擊灰色框上傳內容照片。',fields:[{key:'a-hl-1',label:'主句',tag:'textarea'},{key:'a-bd-1',label:'內文',tag:'textarea'}]},
+      {label:'純文字頁 P3',tip:'三行列舉節奏。',fields:[{key:'a-hl-2',label:'主句',tag:'textarea'},{key:'a-bd-2',label:'內文',tag:'textarea'}]},
+      {label:'引言頁 P4',tip:'情感制高點，全頁置中。',fields:[{key:'a-hl-3',label:'引言主句',tag:'textarea'},{key:'a-bd-3',label:'補充句',tag:'textarea'}]},
+      {label:'圖文頁 P5',tip:'點擊灰色框上傳照片。',fields:[{key:'a-hl-4',label:'主句',tag:'textarea'},{key:'a-bd-4',label:'內文',tag:'textarea'}]},
+      {label:'品牌宣言頁 P6',tip:'品牌收尾。',fields:[{key:'a-tag-5',label:'頂部標籤',tag:'input'},{key:'a-hl-5',label:'主句',tag:'textarea'},{key:'a-bd-5',label:'收尾宣言',tag:'input'},{key:'a-footer5-l',label:'底部左側',tag:'input'},{key:'a-footer5-r',label:'底部右側',tag:'input'}]},
+      {label:'CTA 頁 P7',tip:'不放照片，保持乾淨白底。',fields:[{key:'a-hl-6',label:'主句',tag:'textarea'},{key:'a-bd-6',label:'內文',tag:'textarea'},{key:'a-cta-6',label:'行動呼籲',tag:'input'}]}
+    ],
+    importMap:{
+      'P1_TAG':'a-tag-0','P1_HL':'a-hl-0','P1_FOOTER_L':'a-footer0-l','P1_FOOTER_R':'a-footer0-r',
+      'P2_HL':'a-hl-1','P2_BODY':'a-bd-1','P3_HL':'a-hl-2','P3_BODY':'a-bd-2',
+      'P4_HL':'a-hl-3','P4_BODY':'a-bd-3','P5_HL':'a-hl-4','P5_BODY':'a-bd-4',
+      'P6_TAG':'a-tag-5','P6_HL':'a-hl-5','P6_BODY':'a-bd-5','P6_FOOTER_L':'a-footer5-l','P6_FOOTER_R':'a-footer5-r',
+      'P7_HL':'a-hl-6','P7_BODY':'a-bd-6','P7_CTA':'a-cta-6'
+    },
+    defaults:{
+      'a-tag-0':'@cjpapa.image','a-hl-0':'有一種道別，你不會說出口。\n只是多看了他一眼。',
+      'a-footer0-l':'','a-footer0-r':'CJPAPA西街阿爸｜你的家庭攝影師',
+      'a-hl-1':'我從來不說「看這裡，笑一個」。',
+      'a-bd-1':'因為那個笑，不是給我的。\n那個笑，是給剛才讓他大笑的事情的。\n\n我只是剛好在場。',
+      'a-hl-2':'稍微大了一點的衣服。\n跑亂的頭髮。\n哭完之後還有點紅的眼睛。',
+      'a-bd-2':'這些，我都留著。\n\n因為多年後你翻到這張照片，\n你會記起那一天的氣味。',
+      'a-hl-3':'旅途中拍照，\n是為了讓未來的自己不孤單。',
+      'a-bd-3':'每一次按下快門，\n我都是在寫一封信，\n寄給十年後的我們。',
+      'a-hl-4':'明明孩子就在眼前，\n卻突然很想把這一秒留住。',
+      'a-bd-4':'不是因為他要離開。\n只是因為，他正在長大。',
+      'a-tag-5':'西街阿爸','a-hl-5':'我是西街阿爸。\n一個不擅長說再見的家庭攝影師。',
+      'a-bd-5':'所以我用照片說。','a-footer5-l':'cjpapa.studio','a-footer5-r':'@cjpapa',
+      'a-hl-6':'如果你也有一個\n想留住的瞬間——',
+      'a-bd-6':'傳訊息給我說：\n「我想拍。」\n那就夠了。','a-cta-6':'📩 預約諮詢，連結在限動'
+    },
+    contentSlots:[1,4]
+  },
+  B: {
+    pageCount: 6,
+    pageState: Array.from({length:6}, ()=>({ox:0,oy:0,bgImage:null,overlayOpacity:45,zoom:100,hlSize:HL_DEFAULT,bodySize:BODY_DEFAULT,
+      fontState:{hl:'noto',body:'noto',tag:'noto',footer:'noto',cta:'noto'},
+      footerColor:'',
+      textColors:{hl:'',body:'',tag:'',cta:''}})),
+    contentImg: {
+      'b3':{image:null,ox:0,oy:0,zoom:100,naturalW:1,naturalH:1}
+    },
+    theme:{bg:'#FAF8F5',text:'#1A1A18',textSoft:'',textMuted:'',accent:'#C8A882'},
+    bgNatural:{},
+    prefix:'b-',
+    slidePrefix:'b-slide-',
+    data:[
+      {label:'封面頁',tip:'主標題留白。可上傳底圖。',fields:[{key:'b-tag-0',label:'頂部標籤',tag:'input'},{key:'b-hl-0',label:'主標題',tag:'textarea'},{key:'b-footer0-l',label:'底部左側',tag:'input'},{key:'b-footer0-r',label:'底部右側',tag:'input'}]},
+      {label:'對話泡泡頁 P2',tip:'引言用對話泡泡呈現，下方補充說明。',fields:[{key:'b-hl-1',label:'泡泡引言',tag:'textarea'},{key:'b-speaker-1',label:'說話者標籤',tag:'input'},{key:'b-bd-1',label:'補充說明',tag:'textarea'}]},
+      {label:'家庭分工頁 P3',tip:'四個角色各填入標籤和說明。',fields:[
+        {key:'b-section-title-2',label:'頁面標題',tag:'input'},
+        {key:'b-role1-label',label:'角色 1 標籤',tag:'input'},{key:'b-role1-text',label:'角色 1 說明',tag:'textarea'},
+        {key:'b-role2-label',label:'角色 2 標籤',tag:'input'},{key:'b-role2-text',label:'角色 2 說明',tag:'textarea'},
+        {key:'b-role3-label',label:'角色 3 標籤',tag:'input'},{key:'b-role3-text',label:'角色 3 說明',tag:'textarea'},
+        {key:'b-role4-label',label:'角色 4 標籤',tag:'input'},{key:'b-role4-text',label:'角色 4 說明',tag:'textarea'},
+      ]},
+      {label:'圖文頁 P4',tip:'點擊灰色框上傳照片。',fields:[{key:'b-hl-3',label:'主句',tag:'textarea'},{key:'b-bd-3',label:'內文',tag:'textarea'}]},
+      {label:'純文字頁 P5',tip:'情感收尾段落。',fields:[{key:'b-hl-4',label:'主句',tag:'textarea'},{key:'b-bd-4',label:'內文',tag:'textarea'}]},
+      {label:'品牌 CTA 頁 P6',tip:'品牌收尾 + 行動呼籲。',fields:[{key:'b-tag-5',label:'頂部標籤',tag:'input'},{key:'b-hl-5',label:'主句',tag:'textarea'},{key:'b-bd-5',label:'內文',tag:'textarea'},{key:'b-cta-5',label:'行動呼籲',tag:'input'},{key:'b-footer5-l',label:'底部左側',tag:'input'},{key:'b-footer5-r',label:'底部右側',tag:'input'}]}
+    ],
+    importMap:{
+      'P1_TAG':'b-tag-0','P1_HL':'b-hl-0','P1_FOOTER_L':'b-footer0-l','P1_FOOTER_R':'b-footer0-r',
+      'P2_HL':'b-hl-1','P2_SPEAKER':'b-speaker-1','P2_BODY':'b-bd-1',
+      'P3_TITLE':'b-section-title-2',
+      'P3_ROLE1_LABEL':'b-role1-label','P3_ROLE1_TEXT':'b-role1-text',
+      'P3_ROLE2_LABEL':'b-role2-label','P3_ROLE2_TEXT':'b-role2-text',
+      'P3_ROLE3_LABEL':'b-role3-label','P3_ROLE3_TEXT':'b-role3-text',
+      'P3_ROLE4_LABEL':'b-role4-label','P3_ROLE4_TEXT':'b-role4-text',
+      'P4_HL':'b-hl-3','P4_BODY':'b-bd-3',
+      'P5_HL':'b-hl-4','P5_BODY':'b-bd-4',
+      'P6_TAG':'b-tag-5','P6_HL':'b-hl-5','P6_BODY':'b-bd-5','P6_CTA':'b-cta-5',
+      'P6_FOOTER_L':'b-footer5-l','P6_FOOTER_R':'b-footer5-r'
+    },
+    defaults:{
+      'b-tag-0':'@cjpapa.image','b-hl-0':'領隊說可以走了，\n我們才敢動。',
+      'b-footer0-l':'','b-footer0-r':'CJPAPA西街阿爸｜你的家庭攝影師',
+      'b-hl-1':'沒有人說「走了」之前，\n沒有人敢動。\n包括我。',
+      'b-speaker-1':'— 我們家的不成文規定',
+      'b-bd-1':'每次出發，都是她先開口。\n我在後面負責按快門。',
+      'b-section-title-2':'家庭分工',
+      'b-role1-label':'領隊（媽媽）','b-role1-text':'看路、看天氣、看所有人的狀態',
+      'b-role2-label':'攝影師（我）','b-role2-text':'看光、看構圖、看有沒有錯過什麼',
+      'b-role3-label':'弟弟','b-role3-text':'看食物',
+      'b-role4-label':'老狗','b-role4-text':'看地板',
+      'b-hl-3':'偶爾，她會忘記我有相機。','b-bd-3':'然後我就拍到這個。',
+      'b-hl-4':'十年了。\n她帶著我們走過很多路。','b-bd-4':'環島的路、上學的路、迷路的路。\n我一直在她身後按快門。\n記錄這個總是走在前面的人。',
+      'b-tag-5':'西街阿爸','b-hl-5':'你們家的「領隊」是誰？','b-bd-5':'留言告訴我。',
+      'b-cta-5':'📩 預約諮詢，連結在限動',
+      'b-footer5-l':'cjpapa.studio','b-footer5-r':'@cjpapa'
+    },
+    contentSlots:['b3']
+  },
+  C: {
+    pageCount: 7,
+    pageState: Array.from({length:7}, ()=>({ox:0,oy:0,bgImage:null,overlayOpacity:45,zoom:100,hlSize:HL_DEFAULT,bodySize:BODY_DEFAULT,
+      fontState:{hl:'noto',body:'noto',tag:'noto',footer:'noto',cta:'noto'},
+      footerColor:'',
+      textColors:{hl:'',body:'',tag:'',cta:''}})),
+    contentImg: {
+      'c1':{image:null,ox:0,oy:0,zoom:100,naturalW:1,naturalH:1},
+      'c4':{image:null,ox:0,oy:0,zoom:100,naturalW:1,naturalH:1}
+    },
+    theme:{bg:'#333330',text:'#F2EFE9',textSoft:'',textMuted:'',accent:'#C8A882'},
+    bgNatural:{},
+    prefix:'c-',
+    slidePrefix:'c-slide-',
+    data:[
+      {label:'封面頁',tip:'深墨底色，金色細節線。',fields:[{key:'c-tag-0',label:'頂部標籤',tag:'input'},{key:'c-hl-0',label:'主標題',tag:'textarea'},{key:'c-footer0-l',label:'底部左側',tag:'input'},{key:'c-footer0-r',label:'底部右側',tag:'input'}]},
+      {label:'圖文頁 P2',tip:'點擊灰色框上傳內容照片。',fields:[{key:'c-hl-1',label:'主句',tag:'textarea'},{key:'c-bd-1',label:'內文',tag:'textarea'}]},
+      {label:'純文字頁 P3',tip:'三行列舉節奏。',fields:[{key:'c-hl-2',label:'主句',tag:'textarea'},{key:'c-bd-2',label:'內文',tag:'textarea'}]},
+      {label:'引言頁 P4',tip:'情感制高點，全頁置中。',fields:[{key:'c-hl-3',label:'引言主句',tag:'textarea'},{key:'c-bd-3',label:'補充句',tag:'textarea'}]},
+      {label:'圖文頁 P5',tip:'點擊灰色框上傳照片。',fields:[{key:'c-hl-4',label:'主句',tag:'textarea'},{key:'c-bd-4',label:'內文',tag:'textarea'}]},
+      {label:'品牌宣言頁 P6',tip:'品牌收尾。',fields:[{key:'c-tag-5',label:'頂部標籤',tag:'input'},{key:'c-hl-5',label:'主句',tag:'textarea'},{key:'c-bd-5',label:'收尾宣言',tag:'input'},{key:'c-footer5-l',label:'底部左側',tag:'input'},{key:'c-footer5-r',label:'底部右側',tag:'input'}]},
+      {label:'CTA 頁 P7',tip:'乾淨置中收尾。',fields:[{key:'c-hl-6',label:'主句',tag:'textarea'},{key:'c-bd-6',label:'內文',tag:'textarea'},{key:'c-cta-6',label:'行動呼籲',tag:'input'}]}
+    ],
+    importMap:{
+      'P1_TAG':'c-tag-0','P1_HL':'c-hl-0','P1_FOOTER_L':'c-footer0-l','P1_FOOTER_R':'c-footer0-r',
+      'P2_HL':'c-hl-1','P2_BODY':'c-bd-1','P3_HL':'c-hl-2','P3_BODY':'c-bd-2',
+      'P4_HL':'c-hl-3','P4_BODY':'c-bd-3','P5_HL':'c-hl-4','P5_BODY':'c-bd-4',
+      'P6_TAG':'c-tag-5','P6_HL':'c-hl-5','P6_BODY':'c-bd-5','P6_FOOTER_L':'c-footer5-l','P6_FOOTER_R':'c-footer5-r',
+      'P7_HL':'c-hl-6','P7_BODY':'c-bd-6','P7_CTA':'c-cta-6'
+    },
+    defaults:{
+      'c-tag-0':'@cjpapa.image',
+      'c-hl-0':'十年前，\n我們從這裡出發。',
+      'c-footer0-l':'','c-footer0-r':'CJPAPA西街阿爸｜你的家庭攝影師',
+      'c-hl-1':'有些路，\n只有走過的人記得。',
+      'c-bd-1':'2016 年的夏天，\n我們牽著一隻剛撿到的狗，\n走完了 118 天的環島。',
+      'c-hl-2':'背包重了一點。\n孩子高了一點。\n狗，老了。',
+      'c-bd-2':'十年過去，\n我們又站在同一個路口。\n\n只是這次，他們走在前面。',
+      'c-hl-3':'拍照，\n是為了讓未來的自己不孤單。',
+      'c-bd-3':'十年後翻開這些照片，\n我希望我們還記得，\n那一年走過的每一步。',
+      'c-hl-4':'有些東西，\n你只有走過才會懂。',
+      'c-bd-4':'像是天氣怎麼變、\n像是孩子的腳步怎麼跟上來、\n像是狗，怎麼慢慢落在後面。',
+      'c-tag-5':'西街阿爸',
+      'c-hl-5':'我是西街阿爸。\n一個帶著相機重走十年路的爸爸。',
+      'c-bd-5':'這次，我想記得更仔細。',
+      'c-footer5-l':'cjpapa.studio','c-footer5-r':'@cjpapa',
+      'c-hl-6':'如果你也有一段\n想留下的路——',
+      'c-bd-6':'傳訊息給我說：\n「我想拍。」\n那就夠了。',
+      'c-cta-6':'📩 預約諮詢，連結在限動'
+    },
+    contentSlots:['c1','c4']
+  }
+};
+
+/* ══ FONT DEFINITIONS ══ */
+const FONTS = [
+  {id:'noto',  label:'Noto',   family:"'Noto Serif TC', serif",     css:'noto'},
+  {id:'duoduo',label:'多多',   family:"'DuoDuo', sans-serif",        css:'duoduo'},
+  {id:'meiyi', label:'美意',   family:"'MeiYi', monospace",          css:'meiyi'},
+];
+
+// Font variable map: which CSS var each field group controls
+const FONT_VARS = {
+  'hl':     '--font-hl',
+  'body':   '--font-body',
+  'tag':    '--font-tag',
+  'footer': '--font-footer',
+  'cta':    '--font-cta',
+};
+
+/* ══ GETTERS ══ */
+function S(){ return STYLES[currentStyle]; }
+function PS(i){ return S().pageState[i !== undefined ? i : cur]; }
+
+/* ══ COLOUR HELPERS ══ */
+function isColorDark(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return(0.299*r+0.587*g+0.114*b)<140;}
+function blendHex(h1,h2,t){const p=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];const[r1,g1,b1]=p(h1),[r2,g2,b2]=p(h2);return '#'+[r1+(r2-r1)*t,g1+(g2-g1)*t,b1+(b2-b1)*t].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');}
+function hexToRgba(h,a){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
+
+/* ══ APPLY THEME ══ */
+function applyTheme(){
+  const t=S().theme;
+  const dark=isColorDark(t.text);
+  t.textSoft=dark?blendHex(t.text,'#FFFFFF',0.45):blendHex(t.text,t.bg,0.25);
+  t.textMuted=dark?blendHex(t.text,'#FFFFFF',0.65):blendHex(t.text,t.bg,0.5);
+  const r=document.documentElement;
+  r.style.setProperty('--s-bg',t.bg);
+  r.style.setProperty('--s-text',t.text);
+  r.style.setProperty('--s-text-soft',t.textSoft);
+  r.style.setProperty('--s-text-muted',t.textMuted);
+  r.style.setProperty('--s-accent',t.accent);
+  document.getElementById('canvasWrap').style.background=t.bg;
+  applyBgLayer();
+}
+
+/* ══ FONT SIZE ══ */
+function applyFontSize(idx){
+  const ps=PS(idx);
+  const prefix=S().slidePrefix;
+  const slide=document.getElementById(prefix+idx);
+  if(!slide) return;
+  slide.style.setProperty('--hl-size',ps.hlSize+'rem');
+  slide.style.setProperty('--hl-sm-size',(ps.hlSize*0.77).toFixed(3)+'rem');
+  slide.style.setProperty('--body-size',ps.bodySize+'rem');
+}
+function applyAllFontSizes(){for(let i=0;i<S().pageCount;i++)applyFontSize(i);}
+
+/* ══ BG LAYER ══ */
+function applyBgLayer(){
+  const layer=document.getElementById('bgImgLayer');
+  const overlay=document.getElementById('bgOverlay');
+  const ps=PS();
+  const t=S().theme;
+  if(ps.bgImage){
+    const wrap=document.getElementById('canvasWrap');
+    const ww=wrap.offsetWidth,wh=wrap.offsetHeight;
+    const nat=S().bgNatural[cur]||{w:1,h:1};
+    const ir=nat.w/nat.h,br=ww/wh;
+    let bW,bH;
+    if(ir>br){bH=wh;bW=wh*ir;}else{bW=ww;bH=ww/ir;}
+    const z=ps.zoom/100,lw=Math.round(bW*z),lh=Math.round(bH*z);
+    const minRx=(ww-lw)/ww,minRy=(wh-lh)/wh;
+    ps.ox=Math.min(0,Math.max(minRx,ps.ox));
+    ps.oy=Math.min(0,Math.max(minRy,ps.oy));
+    layer.style.width=lw+'px';layer.style.height=lh+'px';
+    layer.style.transform=`translate(${Math.round(ps.ox*ww)}px,${Math.round(ps.oy*wh)}px)`;
+    layer.style.backgroundImage=`url(${ps.bgImage})`;
+    layer.style.backgroundSize='100% 100%';
+    layer.style.opacity='1';
+    overlay.style.background=hexToRgba(t.bg,ps.overlayOpacity/100);
+  } else {
+    layer.style.opacity='0';layer.style.backgroundImage='none';
+    overlay.style.background='transparent';
+  }
+}
+
+function sync(id,val){const el=document.getElementById(id);if(el)el.innerText=val;}
+function loadContentImg(input,slotId){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const src=e.target.result;
+    const img=new Image();
+    img.onload=()=>{
+      S().contentImg[slotId]={image:src,naturalW:img.naturalWidth||1,naturalH:img.naturalHeight||1,ox:0,oy:0,zoom:100};
+      applyContentImgLayer(slotId);renderPanel();saveState();
+    };
+    img.src=src;
+  };
+  reader.readAsDataURL(file);
+}
+function clearContentImg(slotId){
+  S().contentImg[slotId]={image:null,ox:0,oy:0,zoom:100,naturalW:1,naturalH:1};
+  applyContentImgLayer(slotId);renderPanel();saveState();
+}
+function applyContentImgLayer(slotId){
+  const ci=S().contentImg[slotId];
+  if(!ci) return;
+  const layer=document.getElementById('clayer-'+slotId);
+  const upload=document.getElementById('cupload-'+slotId);
+  const box=document.getElementById('cbox-'+slotId);
+  if(!layer||!upload||!box)return;
+  if(ci.image){
+    const bw=box.offsetWidth,bh=box.offsetHeight;
+    const ir=ci.naturalW/ci.naturalH,br=bw/bh;
+    let baseW,baseH;
+    if(ir>br){baseH=bh;baseW=bh*ir;}else{baseW=bw;baseH=bw/ir;}
+    const z=ci.zoom/100,lw=Math.round(baseW*z),lh=Math.round(baseH*z);
+    const minRx=(bw-lw)/bw,minRy=(bh-lh)/bh;
+    ci.ox=Math.min(0,Math.max(minRx,ci.ox));
+    ci.oy=Math.min(0,Math.max(minRy,ci.oy));
+    layer.style.width=lw+'px';layer.style.height=lh+'px';
+    layer.style.transform=`translate(${Math.round(ci.ox*bw)}px,${Math.round(ci.oy*bh)}px)`;
+    layer.style.backgroundImage=`url(${ci.image})`;
+    layer.style.backgroundSize='100% 100%';
+    layer.style.opacity='1';
+    upload.classList.add('has-img');
+    upload.querySelector('.ph').style.display='none';
+  } else {
+    layer.style.opacity='0';layer.style.backgroundImage='none';
+    upload.classList.remove('has-img');
+    upload.querySelector('.ph').style.display='';
+  }
+}
+function applyAllContentImgLayers(){S().contentSlots.forEach(s=>applyContentImgLayer(s));}
+function resetContentPos(slotId){S().contentImg[slotId].ox=0;S().contentImg[slotId].oy=0;applyContentImgLayer(slotId);saveState();}
+function updateContentZoom(slotId,v){
+  S().contentImg[slotId].zoom=parseInt(v);
+  document.getElementById('czoomVal-'+slotId).textContent=v+'%';
+  S().contentImg[slotId].ox=0;S().contentImg[slotId].oy=0;
+  applyContentImgLayer(slotId);saveState();
+}
+
+/* ══ DRAG ══ */
+let drag=null;
+function initDrag(){
+  const wrap=document.getElementById('canvasWrap');
+  function startDrag(cx,cy,e){
+    const cbox=e.target.closest('.c-img-container');
+    if(cbox){
+      const slotId=cbox.id.replace('cbox-','');
+      const ci=S().contentImg[slotId];
+      if(!ci||!ci.image)return;
+      if(e.target.closest('.c-img-upload'))return;
+      e.preventDefault&&e.preventDefault();
+      cbox.classList.add('drag-active');
+      drag={target:'content',slotId,startX:cx,startY:cy,startOx:ci.ox,startOy:ci.oy,containerW:cbox.offsetWidth,containerH:cbox.offsetHeight};
+      return;
+    }
+    if(!PS().bgImage)return;
+    if(e.target.closest('input'))return;
+    e.preventDefault&&e.preventDefault();
+    wrap.classList.add('drag-active','drag-cursor');
+    drag={target:'bg',startX:cx,startY:cy,startOx:PS().ox,startOy:PS().oy,containerW:wrap.offsetWidth,containerH:wrap.offsetHeight};
+  }
+  function moveDrag(cx,cy){
+    if(!drag)return;
+    const dx=(cx-drag.startX)/drag.containerW,dy=(cy-drag.startY)/drag.containerH;
+    if(drag.target==='content'){
+      S().contentImg[drag.slotId].ox=drag.startOx+dx;
+      S().contentImg[drag.slotId].oy=drag.startOy+dy;
+      applyContentImgLayer(drag.slotId);
+    } else {
+      PS().ox=drag.startOx+dx;PS().oy=drag.startOy+dy;applyBgLayer();
+    }
+  }
+  function endDrag(){
+    if(!drag)return;
+    if(drag.target==='content'){const b=document.getElementById('cbox-'+drag.slotId);if(b)b.classList.remove('drag-active');}
+    else wrap.classList.remove('drag-active','drag-cursor');
+    drag=null;
+    saveState();
+  }
+  wrap.addEventListener('mousedown',e=>startDrag(e.clientX,e.clientY,e));
+  window.addEventListener('mousemove',e=>{if(drag)moveDrag(e.clientX,e.clientY);});
+  window.addEventListener('mouseup',endDrag);
+  wrap.addEventListener('touchstart',e=>{const t=e.touches[0];startDrag(t.clientX,t.clientY,e);},{passive:false});
+  window.addEventListener('touchmove',e=>{if(!drag)return;const t=e.touches[0];moveDrag(t.clientX,t.clientY);},{passive:true});
+  window.addEventListener('touchend',endDrag);
+}
+function resetPos(){PS().ox=0;PS().oy=0;applyBgLayer();saveState();}
+function updateOverlay(v){PS().overlayOpacity=parseInt(v);document.getElementById('overlayVal').textContent=v+'%';applyBgLayer();saveState();}
+function updateZoom(v){PS().zoom=parseInt(v);document.getElementById('zoomVal').textContent=v+'%';PS().ox=0;PS().oy=0;applyBgLayer();saveState();}
+
+/* ══ PER-PAGE BG UPLOAD ══ */
+function loadPageBg(input,idx){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const src=e.target.result;
+    const img=new Image();
+    img.onload=()=>{
+      S().bgNatural[idx]={w:img.naturalWidth||1,h:img.naturalHeight||1};
+      PS(idx).bgImage=src;PS(idx).ox=0;PS(idx).oy=0;
+      applyBgLayer();renderPanel();saveState();
+    };
+    img.src=src;
+  };
+  reader.readAsDataURL(file);
+}
+function clearPageBg(idx){PS(idx).bgImage=null;applyBgLayer();renderPanel();saveState();}
+
+/* ══ SWATCHES ══ */
+function renderSwatches(){
+  ['bg','text','accent'].forEach(role=>{
+    const sel=S().theme[role];
+    document.getElementById(role+'Swatches').innerHTML=BRAND[role].map(col=>{
+      const s=col.hex.toLowerCase()===sel.toLowerCase();
+      const ring=isColorDark(col.hex)?'#FAF8F5':'#1A1A18';
+      return `<div class="color-swatch${s?' selected':''}" style="background:${col.hex};${s?`border-color:${ring};`:''}" title="${col.label}" onclick="pickColor('${role}','${col.hex}')"></div>`;
+    }).join('');
+  });
+}
+function pickColor(role,hex){S().theme[role]=hex;applyTheme();renderSwatches();saveState();}
+
+/* ══ STYLE SWITCH ══ */
+function switchStyle(s){
+  currentStyle=s;
+  cur=0;
+  document.getElementById('styleBtnA').classList.toggle('active',s==='A');
+  document.getElementById('styleBtnB').classList.toggle('active',s==='B');
+  document.getElementById('styleBtnC').classList.toggle('active',s==='C');
+
+  // Show/hide slides — careful: A's prefix is "slide-" which would also match "b-slide-" and "c-slide-"
+  document.querySelectorAll('.slide').forEach(el=>{
+    el.classList.remove('active');
+    el.style.display='none';
+  });
+  const prefix=S().slidePrefix;
+  document.querySelectorAll(`[id^="${prefix}"]`).forEach(el=>{
+    // For style A, only show ids that are exactly "slide-N" (not "b-slide-N" or "c-slide-N")
+    if(prefix==='slide-' && (el.id.startsWith('b-slide-') || el.id.startsWith('c-slide-'))) return;
+    el.style.display='';
+  });
+
+  applyAllFontSizes();
+  applyAllFontStates();
+  applyAllContentImgLayers();
+  showSlide(0);
+  renderDots();
+  renderPanel();
+  applyTheme();
+  renderSwatches();
+  updateExportBtn();
+  saveState();
+}
+
+/* ══ NAV ══ */
+function renderDots(){
+  const n=S().pageCount;
+  document.getElementById('dots').innerHTML=
+    Array.from({length:n},(_,i)=>`<div class="dot${i===cur?' on':''}" onclick="jumpTo(${i})"></div>`).join('');
+}
+function showSlide(i){
+  const prefix=S().slidePrefix;
+  const slides=Array.from(document.querySelectorAll(`[id^="${prefix}"]`)).filter(s=>{
+    if(prefix==='slide-' && (s.id.startsWith('b-slide-') || s.id.startsWith('c-slide-'))) return false;
+    return s.classList.contains('slide');
+  });
+  slides.forEach((s,idx)=>s.classList.toggle('active',idx===i));
+  document.getElementById('navLabel').textContent=`P${i+1} / ${S().pageCount}`;
+}
+function go(dir){cur=(cur+dir+S().pageCount)%S().pageCount;showSlide(cur);renderDots();renderPanel();applyBgLayer();saveState();}
+function jumpTo(i){cur=i;showSlide(cur);renderDots();renderPanel();applyBgLayer();saveState();}
+
+/* ══ EDIT PANEL ══ */
+function renderPanel(){
+  const d=S().data[cur];
+  const ps=PS();
+  let html=`<div class="panel"><div class="panel-title">編輯 P${cur+1}<em>${d.label}</em></div>`;
+
+  d.fields.forEach(f=>{
+    const el=document.getElementById(f.key);
+    const val=el?(el.innerText||el.textContent).trim():'';
+    const key=f.key;
+    let fontRole=null, colorRole=null;
+    if(key.includes('-hl-')||key.includes('bubble')) { fontRole='hl'; colorRole='hl'; }
+    else if(key.includes('speaker')) { fontRole='hl'; colorRole='tag'; }
+    else if(key.includes('-bd-')||(key.includes('role')&&key.includes('text'))) { fontRole='body'; colorRole='body'; }
+    else if(key.includes('-tag-')||(key.includes('role')&&key.includes('label'))||key.includes('section')) { fontRole='tag'; colorRole='tag'; }
+    else if(key.includes('footer')) { fontRole='footer'; colorRole='footer'; }
+    else if(key.includes('cta')) { fontRole='cta'; colorRole='cta'; }
+
+    const colorLabel = {hl:'主標題色',body:'內文色',tag:'標籤 / 強調色',cta:'行動呼籲色',footer:'底部文字色'}[colorRole]||'';
+
+    if(f.tag==='textarea'){
+      html+=`<div class="field"><label>${f.label}</label><textarea rows="3" oninput="sync('${f.key}',this.value)">${val}</textarea>
+        ${fontRole?fontPickerHTML(fontRole):''}
+        ${colorRole?textColorPickerHTML(colorRole,colorLabel):''}
+      </div>`;
+    } else {
+      html+=`<div class="field"><label>${f.label}</label><input type="text" value="${val}" oninput="sync('${f.key}',this.value)">
+        ${fontRole?fontPickerHTML(fontRole):''}
+        ${colorRole?textColorPickerHTML(colorRole,colorLabel):''}
+      </div>`;
+    }
+  });
+
+  const hlPct=Math.round((ps.hlSize/HL_DEFAULT)*100);
+  const bodyPct=Math.round((ps.bodySize/BODY_DEFAULT)*100);
+  html+=`<div class="font-slider-group"><div class="group-title">文字大小</div>
+    <div class="fsr"><label>主標題</label><input type="range" min="60" max="200" value="${hlPct}" oninput="updateFontSize('hl',${cur},this.value,this.nextElementSibling)"><span>${hlPct}%</span></div>
+    <div class="fsr"><label>內文</label><input type="range" min="60" max="200" value="${bodyPct}" oninput="updateFontSize('body',${cur},this.value,this.nextElementSibling)"><span>${bodyPct}%</span></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:2px;"><button class="fsr-reset" onclick="resetFontSize(${cur})">還原預設</button></div>
+  </div>`;
+
+  html+=`<div class="tip-box">${d.tip}</div>`;
+
+  // content image controls
+  S().contentSlots.forEach(slotId=>{
+    const slotPage = typeof slotId==='number' ? slotId : parseInt(slotId.replace('b',''));
+    if(cur !== (typeof slotId==='number' ? slotId : (currentStyle==='B'? ['b3'].indexOf(slotId) + 3 : -1) )) return;
+    const ci=S().contentImg[slotId];
+    if(ci){
+      if(ci.image){
+        html+=`<div class="color-section-title" style="margin-top:4px;">內容照片</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="bg-upload-btn" style="flex:1;"><img src="${ci.image}" style="width:32px;height:32px;border-radius:4px;object-fit:cover;flex-shrink:0;"><span>點擊更換</span><input type="file" accept="image/*" onchange="loadContentImg(this,'${slotId}')"></div>
+          <button class="bg-clear-btn" style="flex-shrink:0;border:1px solid var(--border);border-radius:6px;padding:6px 10px;" onclick="clearContentImg('${slotId}')">✕</button>
+        </div>
+        <div class="slider-row"><label>縮放</label><input type="range" min="100" max="300" value="${ci.zoom}" id="czoomVal-${slotId}-slider" oninput="updateContentZoom('${slotId}',this.value)"><span id="czoomVal-${slotId}">${ci.zoom}%</span></div>
+        <div class="drag-info">在照片區域拖移調整位置。<br><button class="reset-pos-btn" style="margin-top:4px;" onclick="resetContentPos('${slotId}')">重置位置</button></div>`;
+      } else {
+        html+=`<div class="color-section-title" style="margin-top:4px;">內容照片</div>
+        <div class="bg-upload-btn"><span>＋ 上傳照片</span><input type="file" accept="image/*" onchange="loadContentImg(this,'${slotId}')"></div>`;
+      }
+    }
+  });
+
+  // bg controls
+  if(ps.bgImage){
+    html+=`<div class="color-section-title" style="margin-top:4px;">底圖照片</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="bg-upload-btn" style="flex:1;"><img src="${ps.bgImage}" style="width:32px;height:32px;border-radius:4px;object-fit:cover;flex-shrink:0;"><span>點擊更換底圖</span><input type="file" accept="image/*" onchange="loadPageBg(this,${cur})"></div>
+      <button class="bg-clear-btn" style="flex-shrink:0;border:1px solid var(--border);border-radius:6px;padding:6px 10px;" onclick="clearPageBg(${cur})">✕ 移除</button>
+    </div>
+    <div class="slider-row"><label>底色遮罩</label><input type="range" min="0" max="95" value="${ps.overlayOpacity}" id="overlaySlider" oninput="updateOverlay(this.value)"><span id="overlayVal">${ps.overlayOpacity}%</span></div>
+    <div class="slider-row"><label>縮放</label><input type="range" min="100" max="300" value="${ps.zoom}" id="zoomSlider" oninput="updateZoom(this.value)"><span id="zoomVal">${ps.zoom}%</span></div>
+    <div class="drag-info">拖移預覽畫面調整底圖位置。<br><button class="reset-pos-btn" style="margin-top:4px;" onclick="resetPos()">重置位置</button></div>`;
+  } else {
+    html+=`<div class="color-section-title" style="margin-top:4px;">底圖照片</div>
+    <div class="bg-upload-btn"><span>＋ 上傳這一頁的底圖</span><input type="file" accept="image/*" onchange="loadPageBg(this,${cur})"></div>`;
+  }
+
+  html+=`</div>`;
+  document.getElementById('editPanel').innerHTML=html;
+}
+
+function updateFontSize(type,idx,pct,label){
+  const v=parseInt(pct); label.textContent=v+'%';
+  if(type==='hl') S().pageState[idx].hlSize=+(HL_DEFAULT*v/100).toFixed(4);
+  else S().pageState[idx].bodySize=+(BODY_DEFAULT*v/100).toFixed(4);
+  applyFontSize(idx);
+  saveState();
+}
+function resetFontSize(idx){
+  S().pageState[idx].hlSize=HL_DEFAULT;S().pageState[idx].bodySize=BODY_DEFAULT;
+  applyFontSize(idx);renderPanel();
+  saveState();
+}
+
+function applyFontState(idx){
+  const ps = S().pageState[idx];
+  const fs = ps.fontState;
+  const tc = ps.textColors;
+  const slide = document.getElementById(S().slidePrefix + idx);
+  if(!slide) return;
+  // fonts
+  Object.entries(FONT_VARS).forEach(([role, cssVar])=>{
+    const font = FONTS.find(f=>f.id===(fs[role]||'noto')) || FONTS[0];
+    slide.style.setProperty(cssVar, font.family);
+  });
+  // per-page text colors
+  const colorMap = {
+    hl:     '--page-hl-color',
+    body:   '--page-body-color',
+    tag:    '--page-tag-color',
+    cta:    '--page-cta-color',
+    footer: '--footer-color',
+  };
+  Object.entries(colorMap).forEach(([role, cssVar])=>{
+    const val = role==='footer' ? ps.footerColor : (tc[role]||'');
+    if(val) slide.style.setProperty(cssVar, val);
+    else slide.style.removeProperty(cssVar);
+  });
+}
+
+const PAGE_COLORS = [
+  {hex:'',        label:'跟隨主題'},
+  {hex:'#FAF8F5', label:'米白'},
+  {hex:'#F2EFE9', label:'象牙'},
+  {hex:'#1A1A18', label:'深墨'},
+  {hex:'#333330', label:'柔墨'},
+  {hex:'#9A9A94', label:'霧灰'},
+  {hex:'#C8A882', label:'品牌金'},
+  {hex:'#B88065', label:'磚陶'},
+  {hex:'#4A5D46', label:'森林綠'},
+  {hex:'#FFFFFF', label:'純白'},
+];
+
+function textColorSwatches(role, currentVal){
+  return PAGE_COLORS.map(c=>{
+    const isActive = (c.hex||'') === (currentVal||'');
+    const ring = c.hex ? (isColorDark(c.hex)?'#FAF8F5':'#1A1A18') : 'var(--gold)';
+    const bg = c.hex || '#E8E4DE';
+    return `<div class="fc-swatch${isActive?' active':''}"
+      style="background:${bg};border:2px solid ${isActive?ring:'transparent'};width:20px;height:20px;border-radius:50%;cursor:pointer;flex-shrink:0;transition:transform 0.1s;"
+      title="${c.label}"
+      onclick="pickTextColor('${role}','${c.hex}')">
+      ${!c.hex?`<span style="font-size:8px;color:var(--ink-muted);line-height:20px;display:block;text-align:center;">自</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function textColorPickerHTML(role, label){
+  const tc = PS().textColors || {};
+  const fc = PS().footerColor || '';
+  const val = role==='footer' ? fc : (tc[role]||'');
+  return `<div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <span style="font-size:10px;letter-spacing:0.1em;color:var(--ink-muted);white-space:nowrap;">${label}</span>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;">${textColorSwatches(role, val)}</div>
+  </div>`;
+}
+
+function pickTextColor(role, hex){
+  if(role==='footer'){
+    PS().footerColor = hex;
+  } else {
+    PS().textColors[role] = hex;
+  }
+  applyFontState(cur);
+  renderPanel();
+  saveState();
+}
+
+function applyAllFontStates(){for(let i=0;i<S().pageCount;i++)applyFontState(i);}
+
+function pickFont(role, fontId){
+  PS().fontState[role] = fontId;
+  applyFontState(cur);
+  renderPanel();
+  saveState();
+}
+
+function fontPickerHTML(role){
+  const current = PS().fontState[role] || 'noto';
+  return `<div class="font-picker-row">`+
+    FONTS.map(f=>`<button class="fp-btn font-${f.id}${current===f.id?' active':''}" onclick="pickFont('${role}','${f.id}')">${f.label}</button>`).join('')+
+    `</div>`;
+}
+
+/* ══ MODE ══ */
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.mode-tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&m==='carousel')||(i===1&&m==='story')));
+  document.getElementById('canvasWrap').className=`canvas-wrap ${m}`;
+  // ratio-based ox/oy are size-independent — no need to reset on mode switch
+  applyBgLayer();
+  applyAllContentImgLayers();
+  updateExportBtn();
+  saveState();
+}
+function updateExportBtn(){
+  const sz=mode==='carousel'?'2160×2160':'2160×3840';
+  const n=S().pageCount;
+  document.getElementById('exportOneBtn').textContent=`↓ 匯出這一頁　${sz} JPG`;
+  document.getElementById('exportAllBtn').textContent=`↓ 全部匯出（${n} 頁）　${sz} JPG`;
+}
+
+/* ══ EXPORT ══ */
+const CAROUSEL_W=2160,CAROUSEL_H=2160,STORY_W=2160,STORY_H=3840;
+const PREV_C=500,PREV_SW=281,PREV_SH=500;
+
+async function captureSlide(idx){
+  const savedCur=cur; cur=idx;
+  const wrap=document.getElementById('canvasWrap');
+  const isC=mode==='carousel';
+  const expW=isC?CAROUSEL_W:STORY_W,expH=isC?CAROUSEL_H:STORY_H;
+  const prevW=isC?PREV_C:PREV_SW,prevH=isC?PREV_C:PREV_SH;
+  const ratio=expW/prevW;
+
+  wrap.style.cssText+=`;width:${expW}px;height:${expH}px;position:fixed;top:-9999px;left:-9999px;z-index:-1;`;
+  const htmlEl=document.documentElement;
+  const origFS=htmlEl.style.fontSize;
+  htmlEl.style.fontSize=(16*ratio)+'px';
+
+  void wrap.offsetWidth;
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+
+  showSlide(idx);
+  // Only process current style's slides (not the other style's hidden slides)
+  const styleSlides = Array.from(wrap.querySelectorAll(`[id^="${S().slidePrefix}"]`)).filter(s=>{
+    if(S().slidePrefix==='slide-' && (s.id.startsWith('b-slide-') || s.id.startsWith('c-slide-'))) return false;
+    return s.classList.contains('slide');
+  });
+  styleSlides.forEach(s=>{if(s.id!==S().slidePrefix+idx){s.style.display='flex';s.style.opacity='0';s.style.pointerEvents='none';}});
+  void wrap.offsetHeight;
+  await new Promise(r=>requestAnimationFrame(r));
+
+  applyBgLayer();
+  S().contentSlots.forEach(s=>applyContentImgLayer(s));
+
+  styleSlides.forEach(s=>{if(s.id!==S().slidePrefix+idx){s.style.display='';s.style.opacity='';s.style.pointerEvents='';}});
+  await new Promise(r=>setTimeout(r,100));
+  await new Promise(r=>requestAnimationFrame(r));
+
+  // Hide the ↺ upload buttons so they don't appear in the exported image
+  const uploadBtns=wrap.querySelectorAll('.c-img-upload');
+  uploadBtns.forEach(el=>el.style.display='none');
+
+  const canvas=await html2canvas(wrap,{scale:1,width:expW,height:expH,useCORS:true,allowTaint:true,backgroundColor:S().theme.bg,logging:false,imageTimeout:0});
+
+  // Restore upload buttons
+  uploadBtns.forEach(el=>el.style.display='');
+
+  htmlEl.style.fontSize=origFS;
+  wrap.style.width=(isC?PREV_C:PREV_SW)+'px';
+  wrap.style.height=(isC?PREV_C:PREV_SH)+'px';
+  wrap.style.position='';wrap.style.top='';wrap.style.left='';wrap.style.zIndex='';
+
+  void wrap.offsetWidth;
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+
+  cur=savedCur;showSlide(savedCur);applyBgLayer();
+  S().contentSlots.forEach(s=>applyContentImgLayer(s));
+  return canvas;
+}
+
+async function exportOne(){
+  const btn=document.getElementById('exportOneBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> 渲染中…';
+  try{const c=await captureSlide(cur);dl(c,`CJPAPA_${currentStyle}_P${cur+1}_${mode==='story'?'限時動態':'輪播'}.jpg`);}
+  catch(e){alert('匯出失敗：'+e.message);}
+  btn.disabled=false;updateExportBtn();
+}
+
+async function exportAll(){
+  const btn=document.getElementById('exportAllBtn');
+  const prog=document.getElementById('exportProgress');
+  btn.disabled=true;
+  const label=mode==='story'?'限時動態':'輪播';
+  const sz=mode==='carousel'?'2160x2160':'2160x3840';
+  const zip=new JSZip();
+  const n=S().pageCount;
+  for(let i=0;i<n;i++){
+    btn.innerHTML=`<span class="spinner"></span> 渲染第 ${i+1} / ${n} 頁…`;
+    try{
+      const c=await captureSlide(i);
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      const blob=await new Promise(res=>c.toBlob(res,'image/jpeg',0.95));
+      zip.file(`CJPAPA_${currentStyle}_P${i+1}_${label}.jpg`,blob);
+    } catch(e){prog.textContent=`P${i+1} 失敗：${e.message}`;}
+  }
+  btn.innerHTML=`<span class="spinner"></span> 打包中…`;
+  const zipBlob=await zip.generateAsync({type:'blob',compression:'STORE'});
+  const a=document.createElement('a');
+  a.download=`CJPAPA_版型${currentStyle}_${label}_${sz}.zip`;
+  a.href=URL.createObjectURL(zipBlob);a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
+  showSlide(cur);renderDots();applyBgLayer();
+  S().contentSlots.forEach(s=>applyContentImgLayer(s));
+  btn.disabled=false;updateExportBtn();
+  prog.innerHTML='<strong>✓ 匯出完成</strong>，ZIP 已下載';
+}
+function dl(canvas,filename){const a=document.createElement('a');a.download=filename;a.href=canvas.toDataURL('image/jpeg',0.95);a.click();}
+
+/* ══ IMPORT ══ */
+function openImport(){
+  const map=S().importMap;
+  const keys=Object.keys(map);
+  document.getElementById('importDesc').innerHTML=
+    `版型 ${currentStyle} 的格式：<br>`+
+    keys.map(k=>`<code>${k}:</code>`).join('　');
+  document.getElementById('importFeedback').textContent='';
+  document.getElementById('importTextarea').value='';
+  document.getElementById('importBackdrop').classList.add('open');
+  setTimeout(()=>document.getElementById('importTextarea').focus(),120);
+}
+function closeImport(){document.getElementById('importBackdrop').classList.remove('open');}
+function handleBackdropClick(e){if(e.target===document.getElementById('importBackdrop'))closeImport();}
+
+function runImport(){
+  const raw=document.getElementById('importTextarea').value;
+  if(!raw.trim()){document.getElementById('importFeedback').textContent='請貼上文案。';return;}
+  const map=S().importMap;
+  const keys=Object.keys(map);
+  const parsed={};let ck=null,cl=[];
+  raw.split('\n').forEach(line=>{
+    let matched=false;
+    for(const k of keys){if(line.startsWith(k+':')){if(ck)parsed[ck]=cl.join('\n').trimEnd();ck=k;cl=[line.slice(k.length+1).trimStart()];matched=true;break;}}
+    if(!matched&&ck)cl.push(line);
+  });
+  if(ck)parsed[ck]=cl.join('\n').trimEnd();
+  let count=0;
+  for(const[token,elId]of Object.entries(map)){
+    if(parsed[token]!==undefined){const el=document.getElementById(elId);if(el){el.innerText=parsed[token];count++;}}
+  }
+  if(count===0){document.getElementById('importFeedback').textContent='格式不符，請確認。';return;}
+  renderPanel();
+  document.getElementById('importFeedback').textContent=`✓ 已填入 ${count} 個欄位`;
+  setTimeout(()=>closeImport(),900);
+}
+
+/* ══ INIT ══ */
+const STORAGE_KEY = 'cjpapa_carousel_v1';
+
+/* Save state (debounced, called after every change) */
+let saveTimer = null;
+function saveState(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      const snapshot = {
+        currentStyle, mode, cur,
+        styles: {}
+      };
+      Object.keys(STYLES).forEach(key=>{
+        const st = STYLES[key];
+        // Collect all field text values
+        const fieldText = {};
+        st.data.forEach(page=>page.fields.forEach(f=>{
+          const el = document.getElementById(f.key);
+          if(el) fieldText[f.key] = el.innerText;
+        }));
+        snapshot.styles[key] = {
+          pageState: st.pageState,
+          contentImg: st.contentImg,
+          theme: st.theme,
+          bgNatural: st.bgNatural,
+          fieldText
+        };
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch(e){
+      console.warn('儲存失敗（可能容量已滿）：', e);
+    }
+  }, 800);
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return false;
+    const snapshot = JSON.parse(raw);
+    if(snapshot.currentStyle) currentStyle = snapshot.currentStyle;
+    if(snapshot.mode) mode = snapshot.mode;
+    if(typeof snapshot.cur === 'number') cur = snapshot.cur;
+    Object.keys(snapshot.styles||{}).forEach(key=>{
+      if(!STYLES[key]) return;
+      const saved = snapshot.styles[key];
+      const st = STYLES[key];
+      // Merge pageState carefully (preserve any new fields added since save)
+      if(saved.pageState && saved.pageState.length === st.pageState.length){
+        saved.pageState.forEach((p,i)=>Object.assign(st.pageState[i], p));
+      }
+      if(saved.contentImg) Object.assign(st.contentImg, saved.contentImg);
+      if(saved.theme) Object.assign(st.theme, saved.theme);
+      if(saved.bgNatural) Object.assign(st.bgNatural, saved.bgNatural);
+      // Restore field text after defaults are applied
+      if(saved.fieldText){
+        Object.entries(saved.fieldText).forEach(([id,val])=>{
+          const el = document.getElementById(id);
+          if(el) el.innerText = val;
+        });
+      }
+    });
+    return true;
+  } catch(e){
+    console.warn('載入舊狀態失敗：', e);
+    return false;
+  }
+}
+
+function clearSavedState(){
+  if(confirm('確定清空所有編輯內容？這個動作無法復原。')){
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+}
+
+// Set defaults for both styles first
+Object.values(STYLES).forEach(st=>{
+  Object.entries(st.defaults).forEach(([id,val])=>{
+    const el=document.getElementById(id);if(el)el.innerText=val;
+  });
+});
+
+// Then try to restore saved state (overwrites defaults if exists)
+const restored = loadState();
+
+// Hide non-current style slides on init
+// All A slides are id^="slide-"; B uses "b-slide-"; C uses "c-slide-"
+document.querySelectorAll('[id^="b-slide-"]').forEach(el=>{el.style.display='none';});
+document.querySelectorAll('[id^="c-slide-"]').forEach(el=>{el.style.display='none';});
+
+if(currentStyle === 'B'){
+  document.querySelectorAll('[id^="slide-"]').forEach(el=>{
+    if(!el.id.startsWith('b-slide-') && !el.id.startsWith('c-slide-')) el.style.display='none';
+  });
+  document.querySelectorAll('[id^="b-slide-"]').forEach(el=>{el.style.display='';});
+  document.getElementById('styleBtnA').classList.remove('active');
+  document.getElementById('styleBtnB').classList.add('active');
+} else if(currentStyle === 'C'){
+  document.querySelectorAll('[id^="slide-"]').forEach(el=>{
+    if(!el.id.startsWith('b-slide-') && !el.id.startsWith('c-slide-')) el.style.display='none';
+  });
+  document.querySelectorAll('[id^="c-slide-"]').forEach(el=>{el.style.display='';});
+  document.getElementById('styleBtnA').classList.remove('active');
+  document.getElementById('styleBtnC').classList.add('active');
+}
+
+// Apply mode
+if(mode === 'story'){
+  document.querySelectorAll('.mode-tab').forEach((t,i)=>t.classList.toggle('active', i===1));
+  document.getElementById('canvasWrap').className='canvas-wrap story';
+}
+
+renderSwatches();
+applyTheme();
+applyAllFontSizes();
+applyAllFontStates();
+applyAllContentImgLayers();
+// Clamp cur to page count (in case user switched style and old cur was out of range)
+if(cur >= S().pageCount) cur = 0;
+showSlide(cur);
+renderDots();
+renderPanel();
+updateExportBtn();
+initDrag();
+
+// Show restore notice
+if(restored){
+  setTimeout(()=>{
+    const note=document.createElement('div');
+    note.style.cssText='position:fixed;bottom:20px;right:20px;background:#1A1A18;color:white;padding:12px 18px;border-radius:8px;font-size:12px;letter-spacing:0.1em;z-index:200;display:flex;gap:14px;align-items:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);';
+    note.innerHTML=`<span>↻ 已恢復上次編輯</span><button onclick="clearSavedState()" style="background:none;border:1px solid rgba(255,255,255,0.3);color:white;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;letter-spacing:0.08em;">清空重來</button><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.6);cursor:pointer;font-size:14px;">✕</button>`;
+    document.body.appendChild(note);
+    setTimeout(()=>{if(note.parentElement)note.style.opacity='0';note.style.transition='opacity 0.5s';},5000);
+    setTimeout(()=>{if(note.parentElement)note.remove();},5800);
+  },300);
+}
+
+// Auto-save on text input (debounced)
+document.addEventListener('input', e=>{
+  if(e.target.matches('textarea, input[type=text]')) saveState();
+});
+
+// Register service worker for PWA / offline support
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.warn('SW 註冊失敗：', err));
+  });
+}
+</script>
+</body>
+</html>
